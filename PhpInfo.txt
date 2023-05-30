@@ -1,0 +1,1342 @@
+<?php
+
+/*
+ * მარტივი როუტის მაგალითი
+ */
+Route::get('/post/{id}/{name}', function ($id, $name) {
+    return "this post number " . $id . " - " . $name;
+});
+
+/*
+ * როუტზე სახელის დარქმევა
+ */
+Route::get('admin/profile', array('as' => 'profile', function () {
+//    $url = route('admin.home');
+
+    $url = route('profile', [
+        'custom' => 'data'
+    ]);
+
+    return "this url is" . $url;
+}));
+
+/*
+ * როუტიდნა კონტროლერის კონკრეტულ ფუნქციაზე მიმართვა
+ */
+Route::get('post/{id}/{name}/{password}', [PostController::class, 'show_post']);
+/*
+ * როუტზე სახელის დარქმევა
+ */
+Route::get('/contact', [PostController::class, 'contact'])->name('contact_route');
+
+/*
+ * მიგრაციის შექმნა
+ * php artisan make:migration create_table_post --create="posts"
+ */
+
+/*
+ * ახალი სვეტის ჩამატება ბაზაში
+ * php artisan make:migration add_is_admin_colum_posts_table --table="posts"
+ */
+
+/*
+ * RAW SQL QUERIES
+ * INSERT
+ * ჩაინსერტება ფასადების გამოყენებით (Facades) RAW SQL QUERIES
+ */
+
+Route::get('/insert', function () {
+    DB::insert('INSERT  INTO posts (title, content) values(?, ?) ', ['PHP with Laravel', 'Laravel is the best thing that has happened to PHP']);
+
+    $data = ['title' => 'John Doe', 'content' => 'johndoe@example.com'];
+//    DB::table('posts')->insert($data);
+    $inserted = DB::table('posts')->insert($data);
+    if ($inserted) {
+        echo 'Done';
+    }
+});
+
+/*
+ * RAW SQL QUERIES
+ * SELECT
+ */
+Route::get('/read', function () {
+    $result = DB::select('SELECT * FROM posts WHERE id = ?', [1]);
+    dd($result);
+
+    $name = "Doe";
+    $result = DB::select("SELECT * FROM posts WHERE title LIKE :title ", ['title' => "%{$name}%"]);
+    dd($result);
+});
+
+/*
+ * RAW SQL QUERIES
+ * UPDATE
+ */
+Route::get('/update', function () {
+    $update_id = DB::update("UPDATE posts SET title = 'Update Title' WHERE id = :id", ["id" => '2']);
+    dd($update_id);
+});
+
+/*
+ * RAW SQL QUERIES
+ * DELETE
+ */
+Route::get('/delete', function () {
+    return DB::delete("DELETE FROM posts WHERE id = :id", ["id" => '2']);
+});
+
+/*
+ * მოდელის შექმნა
+ * php artisan make:model Post
+ */
+
+/*
+ * მოდელის შექმნა მიგრაციით
+ * php artisan make:model Post -m
+ */
+
+/**
+ * ELOQUENT / ORM
+ * Reading Data
+ */
+Route::get('/read', function () {
+    $post = Post::all();
+
+    foreach ($post as $item) {
+        echo $item->title . "<br>";
+    }
+});
+
+Route::get('/find', function () {
+    return Post::find(1);
+});
+
+/*
+ * ELOQUENT / ORM
+ * Reading / Finding with Constraints
+ */
+Route::get('/findwhere', function () {
+//    return Post::where('id', 1)->orderBy('id','DESC')->take('1')->get();
+    return Post::where('id', '>', 0)->orderBy('id', 'DESC')->get();
+});
+
+/*
+ * ELOQUENT / ORM
+ * More Ways to retrieve data
+ */
+Route::get('/findmore', function () {
+//    return Post::findOrFail(1);
+    return Post::where('users_count', '<', 50)->firstOrFail();
+});
+
+/*
+ * ELOQUENT / ORM
+ * Inserting / Saving Data
+ */
+Route::get('/basicinsert', function () {
+    $post = new POST;
+    $post->title = 'New Eloquent title';
+    $post->content = 'Wow eloquent is realy cool, look at this content';
+    $post->save();
+});
+
+Route::get('/basicinsert2', function () {
+    $post = POST::find(2);
+    $post->title = 'New Eloquent title2';
+    $post->content = 'Wow eloquent is really cool, look at this content2';
+    $post->save();
+});
+
+/*
+ * ELOQUENT / ORM
+ * Creating data and configuring mass assignment
+ */
+Route::get('/create', function () {
+    Post::create(['title' => 'the create method', 'content' => 'WOW i am learning laravel']);
+});
+
+/* Post Models */
+
+class Post extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'title',
+        'content',
+    ];
+}
+
+/*
+ * ELOQUENT / ORM
+ * Update with Eloquent
+ */
+Route::get('/update', function () {
+    Post::where('id', 2)->where('is_admin', 0)->update(['title' => 'New Title', 'content' => 'I Love Php']);
+});
+
+/*
+ * ELOQUENT / ORM
+ * Delete Data
+ */
+Route::get('/delete', function () {
+    $post = Post::find(4);
+    $post->delete();
+});
+
+Route::get('/delete2', function () {
+    Post::destroy(3);
+    Post::destroy(2, 3);
+    Post::where('id', 3)->delete();
+});
+
+/*
+ * ELOQUENT / ORM
+ * Soft Deleting / Trashing
+ * ამ დროს არ ხდება წაშლა, უბრალოდ deleted_at თარიღი იწერება წაშლის თარიღი
+ * სელექთის დროს ისეთი დატა რომელსაც deleted_at შევსებული აქვს არ დასელექთდება
+ */
+Route::get('/softdelete', function () {
+    Post::find(5)->delete();
+});
+
+/* Post Models */
+
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Post extends Model
+{
+    use HasFactory;
+    use SoftDeletes;
+
+    protected $dates = ['deleted_at'];
+    protected $fillable = [
+        'title',
+        'content',
+    ];
+}
+
+/*
+ * ELOQUENT / ORM
+ * Retrieving deleted / trashed records
+ */
+Route::get('/readsoftdelete', function () {
+    // ID - 5 deleted_at სვეტი შევსებულია ამიტომ ID 5-ზე ინფორმაცია ვერ დასელექთდება
+    return Post::find(5);
+    // ინფორმაცია წარმატებით დასელექთდება withTrashed-ის გამოყენებით
+    return Post::withTrashed()->where('id', 5)->get();
+    // დაასელექთებს ობიექტს იმ შემთხვევაში თუ მას აქვს წაშლის თარიღი მითითებული
+    return Post::onlyTrashed()->where('id', 5)->get();
+});
+
+/*
+ * ELOQUENT / ORM
+ * Restoring Deleted / trashed records
+ */
+Route::get('/restore', function () {
+    // ამის შემდგომ ID - 5 ჩანაწერს გაუსუფთავდება წაშლის თარიღი
+    Post::withTrashed()->where('id', 5)->restore();
+});
+
+/*
+ * ELOQUENT / ORM
+ * Deleting a record permanently
+ */
+Route::get('/forcedelete', function () {
+    // სრულიად წაშლის ბაზიდან ID - 5 ჩანაწერს
+    Post::onlyTrashed()->where('id', 5)->forceDelete();
+});
+
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------  ELOQUENT Relationships ----------------------------------------------------------------------------------**/
+/**------------------------------------------------------------ One to One relationship ----------------------------------------------------------------------------------**/
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/*
+ * ELOQUENT Relationships
+ * One to One relationship
+ * hasOne არის მეთოდი Eloquent მოდელის შესახებ, რომელიც განსაზღვრავს ერთერთ ურთიერთობას. იგი განსაზღვრავს, რომ მოცემულ მოდელს აქვს ერთი დაკავშირებული მოდელი
+ * თქვენ ასევე შეგიძლიათ გამოიყენოთ hasOne მეთოდი, რათა განისაზღვროს ურთიერთობა ინვერსიულ მხარეს. ამისათვის თქვენ იყენებთ belongsTo მეთოდს შესაბამის მოდელზე:
+ */
+
+/* User Models */
+public
+function post()
+{
+    return $this->hasOne(Post::class);
+}
+
+Route::get('/user/{id}/post', function ($id) {
+    return User::find(1)->post;
+});
+
+
+/*
+ * Eloquent განსაზღვრავს foreign key(ურთიერთობის უცხოურ გასაღებს) მშობელი მოდელის სახელზე დაყრდნობით. ამ შემთხვევაში, ტელეფონის მოდელს ავტომატურად ვივარაუდებთ,
+ * რომ აქვს user_id უცხო გასაღები. თუ გსურთ ამ კონვენციის უგულებელყოფა, შეგიძლიათ მეორე არგუმენტი გადასცეთ hasOne მეთოდს:
+ */
+
+class User extends Model
+{
+    public function phone()
+    {
+        return $this->hasOne(Phone::class);
+    }
+}
+
+/*
+ * კონვენციის უგულველტოფისთვის ურთიერთობის გასაღებისთვის გადავცეთ მეორე პარამეთრი რომელიც არის ქოლუმნის დასახელება რითაც ხდება კავშირი
+ */
+return $this->hasOne(Phone::class, 'foreign_key');
+
+
+/*
+ * ეს ფრაგმენტი განსაზღვრავს ერთერთ ურთიერთობას მიმდინარე მოდელსა და ტელეფონის მოდელს შორის, სადაც ტელეფონის მოდელს აქვს foreign_key (უცხო გასაღები, ქოლუმნი დასახელებით foreign_key) ,
+ * რომელიც მიუთითებს მიმდინარე მოდელის პირველად გასაღებზე, ხოლო მიმდინარე მოდელს აქვს local_key (ადგილობრივი გასაღები ქოლუმნი დასახელებით local_key), რომელიც მითითებულია
+ * foreign_key (უცხოური გასაღებით,ქოლუმნი დასახელებით foreign_key) ტელეფონის მოდელში.
+ *
+ * #პირველადი გასაღები არის უნიკალური იდენტიფიკატორი კონკრეტული მწკრივის ან ჩანაწერისთვის მონაცემთა ბაზის ცხრილში. იგი გამოიყენება ცხრილის თითოეული მწკრივის ცალსახად იდენტიფიცირებისთვის და
+ * #ცხრილებს შორის ურთიერთობების დასამყარებლად რელაციურ მონაცემთა ბაზაში
+ */
+return $this->hasOne(Phone::class, 'foreign_key', 'local_key');
+
+/*
+ * უკუკავშირი
+ * მომხმარებლის მეთოდის გამოძახებისას, Eloquent შეეცდება მოძებნოს მომხმარებლის მოდელი, რომელსაც აქვს ID, რომელიც ემთხვევა user_id სვეტს ტელეფონის მოდელზე.
+ */
+public
+function user()
+{
+    return $this->belongsTo(User::class, 'foreign_key');
+}
+
+/*
+ * Eloquent განსაზღვრავს foreign_key(უცხო გასაღების) სახელს ურთიერთობის მეთოდის სახელის შემოწმებით და მეთოდის სახელის სუფიქსით _id-ით. ასე რომ,
+ * ამ შემთხვევაში, Eloquent ვარაუდობს, რომ ტელეფონის მოდელს აქვს user_id სვეტი. თუმცა, თუ ტელეფონის მოდელის foreign_key(უცხო გასაღების) არ არის user_id, შეგიძლიათ გადასცეთ მორგებული გასაღების სახელი,
+ * როგორც მეორე არგუმენტი belongsTo მეთოდისთვის:
+ */
+public
+function user()
+{
+    return $this->belongsTo(User::class, 'foreign_key');
+}
+
+/*
+ * თუ მშობელი მოდელი არ იყენებს id-ს, როგორც პირველად გასაღებს, ან გსურთ იპოვოთ ასოცირებული მოდელი სხვა სვეტის გამოყენებით,
+ * შეგიძლიათ მესამე არგუმენტი გადასცეთ belongsTo მეთოდს, რომელშიც მითითებულია მშობლის ცხრილის მორგებული გასაღები:
+ */
+public
+function user()
+{
+    return $this->belongsTo(User::class, 'foreign_key', 'owner_key');
+}
+
+
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------  ELOQUENT Relationships   ---------------------------------------------------------------------------------**/
+/**------------------------------------------------------------ One to Many relationship ----------------------------------------------------------------------------------**/
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/*
+ * ELOQUENT Relationships
+ * One to Many relationship
+ * ერთი-მრავალზე ურთიერთობა გამოიყენება ურთიერთობების დასადგენად, სადაც ერთი მოდელი არის ერთი ან მეტი ბავშვის მოდელის მშობელი.
+ * მაგალითად, ბლოგ პოსტს შეიძლება ჰქონდეს უსასრულო რაოდენობის კომენტარები. ისევე როგორც ყველა სხვა Eloquent ურთიერთობა,
+ * ერთი-დან ბევრთან ურთიერთობა განისაზღვრება მეთოდის განსაზღვრით თქვენს Eloquent მოდელზე:
+ *
+ * გახსოვდეთ, Eloquent ავტომატურად განსაზღვრავს შესაბამისი უცხო გასაღების სვეტს კომენტარის მოდელისთვის. პირობითად,
+ * Eloquent აიღებს მშობელი მოდელის სახელს „snake_case“ და დააწერს _id-ით. ასე რომ, ამ მაგალითში, Eloquent ჩათვლის, რომ უცხო გასაღების სვეტი Comment მოდელის არის post_id.
+ */
+
+class Post extends Model
+{
+    // Get the comments for the blog post.
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
+    }
+}
+
+/*
+ * ურთიერთობის მეთოდის განსაზღვრის შემდეგ, ჩვენ შეგვიძლია მივიღოთ დაკავშირებული კომენტარების კოლექციაზე კომენტარების თვისებაზე წვდომით. დაიმახსოვრე, რადგან Eloquent უზრუნველყოფს
+ * "დინამიური ურთიერთობის თვისებებს", ჩვენ შეგვიძლია მივიღოთ ურთიერთობის მეთოდებზე, თითქოს ისინი განისაზღვროს, როგორც თვისებები მოდელზე:
+ */
+$comments = Post::find(1)->comments;
+foreach ($comments as $comment) {
+    //
+}
+
+/*
+ * ვინაიდან ყველა ურთიერთობა ასევე ემსახურება როგორც შეკითხვის შემქმნელს, თქვენ შეგიძლიათ დაამატოთ დამატებითი შეზღუდვები ურთიერთობის მოთხოვნაზე
+ * კომენტარების მეთოდის გამოძახებით და განაგრძოთ ჯაჭვის პირობები მოთხოვნაზე:
+ */
+$comment = Post::find(1)->comments()
+    ->where('title', 'foo')
+    ->first();
+
+/*
+ *  hasOne მეთოდის მსგავსად, თქვენ ასევე შეგიძლიათ უგულებელყოთ უცხოური და ადგილობრივი გასაღებები hasMany მეთოდზე დამატებითი არგუმენტების გადაცემით:
+ */
+return $this->hasMany(Comment::class, 'foreign_key');
+return $this->hasMany(Comment::class, 'foreign_key', 'local_key');
+
+/*
+ * უკუკავშირი
+ * hasMany ურთიერთობის ინვერსიის დასადგენად, განსაზღვრეთ ურთიერთობის მეთოდი ბავშვის მოდელზე, რომელიც უწოდებს belongsTo მეთოდს:
+ */
+
+class Comment extends Model
+{
+    //Get the post that owns the comment.
+    public function post()
+    {
+        return $this->belongsTo(Post::class);
+    }
+}
+
+/*
+ * ურთიერთობის განსაზღვრის შემდეგ, ჩვენ შეგვიძლია დავიბრუნოთ კომენტარის მშობელი პოსტი პოსტზე "დინამიური ურთიერთობის თვისებაზე" წვდომით:
+ */
+$comment = Comment::find(1);
+return $comment->post->title;
+
+/*
+ * შემდგომი მოქმედებები დამაკავშირებელ გასაღებებს შრორის ანალოგიურად მოქმედებს როგორც ზემოთ ხსენებულ ვარიანტებში
+ */
+public
+function post()
+{
+    return $this->belongsTo(Post::class, 'foreign_key');
+}
+
+public
+function post()
+{
+    return $this->belongsTo(Post::class, 'foreign_key', 'owner_key');
+}
+
+/*
+ * Has One Of Many ურთიერთობა სხვადასხვა ფუქციებთან ფილტრაციისთვის
+ * მაგალითად, მომხმარებლის მოდელი შეიძლება დაკავშირებული იყოს შეკვეთის ბევრ მოდელთან, მაგრამ თქვენ გსურთ განსაზღვროთ მოსახერხებელი გზა მომხმარებლის მიერ განთავსებულ
+ * უახლეს შეკვეთასთან ურთიერთობისთვის. ამის გაკეთება შეგიძლიათ hasOne ურთიერთობის ტიპის გამოყენებით, რომელიც შერწყმულია ofMany მეთოდებთან:
+ */
+//Get the user's most recent order.
+public
+function latestOrder()
+{
+    return $this->hasOne(Order::class)->latestOfMany();
+}
+
+/*
+ * ანალოგიურად, თქვენ შეგიძლიათ განსაზღვროთ მეთოდი ურთიერთობის „უძველესი“ ან პირველი დაკავშირებული მოდელის მოსაპოვებლად:
+ */
+//Get the user's oldest order.
+public
+function oldestOrder()
+{
+    return $this->hasOne(Order::class)->oldestOfMany();
+}
+
+/*
+ * სხვადასხვა დახარისხების კრიტერიუმები
+ * მაგალითად, ofMany მეთოდის გამოყენებით, შეგიძლიათ მიიღოთ მომხმარებლის ყველაზე ძვირადღირებული შეკვეთა. მეთოდი ofMany იღებს დასალაგებელ სვეტს,
+ * როგორც მის პირველ არგუმენტს და რომელი აგრეგატული ფუნქცია (მინ ან მაქსიმუმი) გამოიყენოს შესაბამისი მოდელის მოთხოვნისას:
+ */
+//Get the user's largest order.
+public
+function largestOrder()
+{
+    return $this->hasOne(Order::class)->ofMany('price', 'max');
+}
+
+/*
+ * შესაძლებელია უფრო მოწინავე ურთიერთობის აგება "has one of many". მაგალითად, პროდუქტის მოდელს შეიძლება ჰქონდეს მრავალი ასოცირებული ფასის მოდელი, რომლებიც შენარჩუნებულია სისტემაში
+ * ახალი ფასების გამოქვეყნების შემდეგაც კი. გარდა ამისა, პროდუქტის ფასების შესახებ ახალი მონაცემები შეიძლება გამოქვეყნდეს წინასწარ, რათა ძალაში შევა მომავალში published_at სვეტის მეშვეობით.
+ */
+
+//Get the current pricing for the product.
+public
+function currentPricing()
+{
+    return $this->hasOne(Price::class)->ofMany([
+        'published_at' => 'max',
+        'id' => 'max',
+    ], function ($query) {
+        $query->where('published_at', '<', now());
+    });
+}
+
+/*
+ * Has One Through
+ * ურთიერთობა "has-one-through" განსაზღვრავს ერთი-ერთ ურთიერთობას სხვა მოდელთან. თუმცა, ეს ურთიერთობა განისაზღვრება მესამე დამატებითი მოდელის მეშვეობით
+ *
+ * მაგალითად: ავტომობილების სარემონტო მაღაზიის აპლიკაციაში, თითოეული Mechanic მოდელი შეიძლება ასოცირებული იყოს Car ერთ მოდელთან, ხოლო მანქანის თითოეული
+ * მოდელი შეიძლება ასოცირებული იყოს ერთ Owner მოდელთან. მიუხედავად იმისა, რომ მექანიკოსს და მფლობელს არ აქვთ პირდაპირი ურთიერთობა მონაცემთა ბაზაში,
+ * მექანიკოსს შეუძლია მფლობელთან წვდომა მანქანის მოდელის საშუალებით.
+ *
+ *
+ * პირველი არგუმენტი, რომელიც გადაეცა hasOneThrough მეთოდს, არის საბოლოო მოდელის სახელი, რომლის წვდომა გვსურს, ხოლო მეორე არგუმენტი არის შუალედური მოდელის სახელი.
+ */
+
+class Mechanic extends Model
+{
+    //Get the car's owner.
+    public function carOwner()
+    {
+        return $this->hasOneThrough(Owner::class, Car::class);
+    }
+}
+
+/*
+ * ურთიერთობის მოთხოვნების შესრულებისას გამოყენებული იქნება ტიპიური Eloquent უცხო გასაღების კონვენციები. თუ გსურთ ურთიერთობის გასაღებების მორგება, შეგიძლიათ გადასცეთ ისინი,
+ * როგორც მესამე და მეოთხე არგუმენტები hasOneThrough მეთოდს. მესამე არგუმენტი არის foreign_key სახელი შუალედურ მოდელზე. მეოთხე არგუმენტი არის საბოლოო მოდელის foreign_key სახელი.
+ * მეხუთე არგუმენტი არის local_key, ხოლო მეექვსე არგუმენტი არის შუალედური მოდელის local_key:
+ */
+
+class Mechanic extends Model
+{
+    //Get the car's owner.
+    public function carOwner()
+    {
+        return $this->hasOneThrough(
+            Owner::class,
+            Car::class,
+            'mechanic_id', // Foreign key on the cars table...
+            'car_id', // Foreign key on the owners table...
+            'id', // Local key on the mechanics table...
+            'id' // Local key on the cars table...
+        );
+    }
+}
+
+
+/*
+ * Has Many Through
+ * ურთიერთობა "has-Many-through" გამოიყენება ორ მოდელს შორის ურთიერთობის დასადგენად, სადაც ერთ მოდელს აქვს სხვა მოდელის მრავალი მაგალითი, მესამე მოდელის მეშვეობით.
+ *
+ * მაგალითად: პროექტის მოდელს შეიძლება ჰქონდეს წვდომა მრავალ განლაგების მოდელზე შუალედური გარემოს მოდელის მეშვეობით
+ * მიუხედავად იმისა, რომ Deployment მოდელის ცხრილი არ შეიცავს project_id სვეტს, hasManyThrough კავშირი უზრუნველყოფს წვდომას პროექტის განლაგებაზე $project->deployments-ის საშუალებით.
+ * ამ მოდელების მისაღებად, Eloquent ამოწმებს project_id სვეტს შუალედური გარემო მოდელის ცხრილზე. შესაბამისი გარემოს ID-ების პოვნის შემდეგ, ისინი გამოიყენება Deployment მოდელის ცხრილის.
+ */
+
+class Project extends Model
+{
+    //Get all of the deployments for the project.
+    public function deployments()
+    {
+        return $this->hasManyThrough(Deployment::class, Environment::class);
+    }
+}
+
+/*
+ * თუ გსურთ ურთიერთობის გასაღებების მორგება, შეგიძლიათ გადასცეთ ისინი, როგორც მესამე და მეოთხე არგუმენტები hasManyThrough მეთოდს. მესამე არგუმენტი არის foreign_key სახელი შუალედურ მოდელზე.
+ * მეოთხე არგუმენტი არის საბოლოო მოდელის foreign_key სახელი. მეხუთე არგუმენტი არის local_key, ხოლო მეექვსე არგუმენტი არის შუალედური მოდელის local_key:
+ */
+
+class Project extends Model
+{
+    public function deployments()
+    {
+        return $this->hasManyThrough(
+            Deployment::class,
+            Environment::class,
+            'project_id', // Foreign key on the environments table...
+            'environment_id', // Foreign key on the deployments table...
+            'id', // Local key on the projects table...
+            'id' // Local key on the environments table...
+        );
+    }
+}
+
+
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------  ELOQUENT Relationships   ---------------------------------------------------------------------------------**/
+/**------------------------------------------------------------ Many to Many relationship ---------------------------------------------------------------------------------**/
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/*
+ * ELOQUENT Relationships
+ * Many to Many relationship
+ *
+ * Many-to-many ურთიერთობა ოდნავ უფრო რთულია, ვიდრე hasOne და hasMany ურთიერთობები. Many-to-many ურთიერთობის მაგალითია მომხმარებელი, რომელსაც აქვს მრავალი როლი და ეს როლები ასევე გაზიარებულია
+ * სხვა მომხმარებლების მიერ აპლიკაციაში. მაგალითად, მომხმარებელს შეიძლება დაეკისროს „ავტორის“ და „რედაქტორის“ როლი; თუმცა, ეს როლები ასევე შეიძლება მიენიჭოს სხვა მომხმარებლებსაც. ასე რომ, მომხმარებელს
+ * ბევრი როლი აქვს და როლს ბევრი მომხმარებელი ჰყავს.
+ *
+ * ამ ურთიერთობის განსაზღვრისთვის საჭიროა მონაცემთა ბაზის სამი ცხრილი: მომხმარებლები, როლები და როლის_მომხმარებელი. Role_user ცხრილი მიღებულია შესაბამისი მოდელების სახელების ანბანური თანმიმდევრობიდან
+ * შეიცავს user_id და role_id სვეტებს. ეს ცხრილი გამოიყენება როგორც შუალედური ცხრილი, რომელიც აკავშირებს მომხმარებლებს და როლებს. თუ გვინდა სხვა სახელის თეიბლის გამოყენება უნდა მივუთითოთ მერე პარამეტრად
+ */
+
+class User extends Model
+{
+    //The roles that belong to the user.
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class);
+    }
+}
+
+/* ურთიერთობის განსაზღვრის შემდეგ, თქვენ შეგიძლიათ შეხვიდეთ მომხმარებლის როლებზე როლების დინამიური ურთიერთობის თვისების გამოყენებით: */
+$user = User::find(1);
+foreach ($user->roles as $role) {
+    // code
+}
+
+/* შესაძლებელია დაამატოთ დამატებითი შეზღუდვები ურთიერთობის მოთხოვნას როლების მეთოდის გამოძახებით და განაგრძოთ ჯაჭვის პირობები მოთხოვნაზე: */
+$roles = User::find(1)->roles()->orderBy('name')->get();
+
+/*
+ * ურთიერთობის შუალედური ცხრილის ცხრილის სახელის დასადგენად, Eloquent შეუერთდება ორი დაკავშირებული მოდელის სახელს ანბანური თანმიმდევრობით.
+ * თუმცა, თქვენ თავისუფლად შეგიძლიათ უგულებელყოთ ეს კონვენცია. თქვენ შეგიძლიათ ამის გაკეთება მეორე არგუმენტის გადაცემით belongsToMany მეთოდზე:
+ */
+return $this->belongsToMany(Role::class, 'role_user');
+
+/*
+ * შუალედური ცხრილის სახელის მორგების გარდა, თქვენ ასევე შეგიძლიათ დააკონფიგურიროთ ცხრილის სვეტების სახელები, დამატებითი არგუმენტების გადაცემით belongsToMany მეთოდისთვის.
+ * მესამე არგუმენტი არის მოდელის foreign_key სახელი, რომელზეც თქვენ განსაზღვრავთ ურთიერთობას, ხოლო მეოთხე არგუმენტი არის მოდელის foreign_key სახელი, რომელსაც თქვენ უერთდებით:
+ */
+return $this->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id');
+
+/*
+ * Many-to-many ურთიერთობებთან მუშაობა მოითხოვს შუალედური ცხრილის არსებობას. Eloquent გთავაზობთ ამ ცხრილთან ურთიერთობა შეგვიძლია pivot ატრიბუტის გამოყენებით:
+ */
+
+$user = User::find(1);
+foreach ($user->roles as $role) {
+    echo $role->pivot->created_at;
+}
+/*
+ * შუამავალი თეიბლიდან წამროდგენილი იქნება მხოლოდ დამაკვაშირებელი სვეტების მნიშვნელობები , თუ გვსურს დამტებითი სვეტების წამოღებაც მაშინ ის უნდა გადავცეთ კავშირის დროს
+ */
+return $this->belongsToMany(Role::class)->withPivot('active', 'created_by');
+
+/*
+ * თუ გსურთ, რომ თქვენს შუალედურ ცხრილს ჰქონდეს timestamps create_at და updated_at, რომლებიც ავტომატურად შეინახება Eloquent-ის მიერ, დაუკავშირდით withTimestamps მეთოდს ურთიერთობის განსაზღვრისას:
+ */
+return $this->belongsToMany(Role::class)->withTimestamps();
+
+
+/*
+ * როგორც უკვე აღვნიშნეთ, შუალედური ცხრილის ატრიბუტებზე წვდომა შესაძლებელია მოდელებზე pivot ატრიბუტის მეშვეობით.
+ * თუმცა, თქვენ თავისუფლად შეგიძლიათ დააკონფიგურიროთ ამ ატრიბუტის სახელი, რათა უკეთ აისახოს მისი მიზანი თქვენს აპლიკაციაში.
+ */
+return $this->belongsToMany(Podcast::class)
+    ->as('subscription')
+    ->withTimestamps();
+
+// Example
+$users = User::with('podcasts')->get();
+foreach ($users->flatMap->podcasts as $podcast) {
+    echo $podcast->subscription->created_at;
+}
+
+/*
+ * თქვენ ასევე შეგიძლიათ გაფილტროთ დაბრუნებული შედეგები belongsToMany ურთიერთობის მოთხოვნების მიხედვით
+ * WherePivot, WherePivotIn, WherePivotNotIn, WherePivotBetween, WherePivotNotBetween, WherePivotNull და WherePivotNotNull მეთოდების გამოყენებით ურთიერთობის განსაზღვრისას:
+ */
+return $this->belongsToMany(Role::class)
+    ->wherePivot('approved', 1);
+
+return $this->belongsToMany(Role::class)
+    ->wherePivotIn('priority', [1, 2]);
+
+return $this->belongsToMany(Role::class)
+    ->wherePivotNotIn('priority', [1, 2]);
+
+return $this->belongsToMany(Podcast::class)
+    ->as('subscriptions')
+    ->wherePivotBetween('created_at', ['2020-01-01 00:00:00', '2020-12-31 00:00:00']);
+
+return $this->belongsToMany(Podcast::class)
+    ->as('subscriptions')
+    ->wherePivotNotBetween('created_at', ['2020-01-01 00:00:00', '2020-12-31 00:00:00']);
+
+return $this->belongsToMany(Podcast::class)
+    ->as('subscriptions')
+    ->wherePivotNull('expired_at');
+
+return $this->belongsToMany(Podcast::class)
+    ->as('subscriptions')
+    ->wherePivotNotNull('expired_at');
+
+
+/*
+ * თქვენ შეგიძლიათ შეუკვეთოთ დაბრუნებული შედეგები belongsToMany ურთიერთობის მოთხოვნით orderByPivot მეთოდის გამოყენებით. შემდეგ მაგალითში, ჩვენ დავიბრუნებთ მომხმარებლისთვის ყველა უახლეს ბეიჯს:
+ */
+return $this->belongsToMany(Badge::class)
+    ->where('rank', 'gold')
+    ->orderByPivot('created_at', 'desc');
+
+/*
+ * ჩვენ შეგვიძლია განვსაზღვროთ Custom Pivot მოდელები გაძლევთ შესაძლებლობას განსაზღვროთ დამატებითი 'behavior'  Pivot მოდელზე, როგორიცაა methods და casts.
+ */
+
+/* Role Models  */
+
+class Role extends Model
+{
+    public function users()
+    {
+        return $this->belongsToMany(User::class)->using(RoleUser::class);
+    }
+}
+
+/* RoleUser Models  */
+
+class RoleUser extends Pivot
+{
+    protected $table = 'role_user';
+    protected $fillable = ['role_id', 'user_id', 'start_date', 'end_date'];
+    protected $dates = ['start_date', 'end_date'];
+
+    public function scopeActiveRoleUser($query)
+    {
+        return $query->where('end_date', '>', now());
+    }
+}
+
+// Create a new user
+$user = new User();
+$user->name = "John Doe";
+$user->save();
+
+// Create a new role
+$role = new Role();
+$role->name = "admin";
+$role->save();
+
+$user->roles()->attach($role, ['start_date' => now(), 'end_date' => now()->addYear()]);
+$pivot = $user->roles->first()->pivot;
+
+// Scope მეთოდის გამოყენებისას პრეფიქსის მოშორება შეგვიძლია, უმცა სრული სახელით წინ პრეფიქსი scope-ითაც იმუშავებს მაგრამ მირებული შეთანხმებაა რომ მის გარეშე გამოვიყენოთ
+$activeRoles = $user->roles()->ActiveRoleUser()->get();
+
+
+/*
+ * ასევე უნდა აღინიშნოს რომ როდესაც ვიყენებთ Custom Pivot მოდელს და მასში არის autoincrement ID მაშინ უნდა მოხდეს მოდელში მისი ჩართვა
+ */
+//Indicates if the IDs are auto-incrementing.
+public
+$incrementing = true;
+
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------  ELOQUENT Relationships   ---------------------------------------------------------------------------------**/
+/**------------------------------------------------------------        Polymorphic        ---------------------------------------------------------------------------------**/
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+
+/*
+ * Polymorphic Relationships
+ * პოლიმორფული ურთიერთობა საშუალებას აძლევს შვილი მოდელს მიეკუთვნებოდეს ერთზე მეტი ტიპის მოდელს ერთი ასოციაციის გამოყენებით.
+ */
+
+/*
+ * Polymorphic Relationships
+ * One To One (Polymorphic)
+ *
+ * გაითვალისწინეთ imageable_id და imageable_type სვეტები images ცხრილზე. imageable_id სვეტი შეიცავს პოსტის ან მომხმარებლის ID მნიშვნელობას,
+ * ხოლო imageable_type სვეტი შეიცავს მშობელი მოდელის კლასის სახელს. imageable_type სვეტს იყენებს Eloquent, რათა დადგინდეს, თუ რომელი "ტიპის"
+ * მშობელი მოდელი დააბრუნოს გამოსახულებადი კავშირზე წვდომისას. ამ შემთხვევაში, სვეტი შეიცავდა ან App\Models\Post ან App\Models\User.
+ *
+ *  posts
+ *      id - integer
+ *      name - string
+ *   users
+ *       id - integer
+ *       name - string
+ *  images
+ *      id - integer
+ *      url - string
+ *      imageable_id - integer
+ *      imageable_type - string
+ */
+
+class Image extends Model
+{
+    //Get the parent imageable model (user or post).
+    public function imageable()
+    {
+        return $this->morphTo();
+    }
+}
+
+class Post extends Model
+{
+    //Get the post's image.
+    public function image()
+    {
+        return $this->morphOne(Image::class, 'imageable');
+    }
+}
+
+class User extends Model
+{
+    //Get the user's image.
+    public function image()
+    {
+        return $this->morphOne(Image::class, 'imageable');
+    }
+}
+
+/*
+ * თქვენი მონაცემთა ბაზის ცხრილისა და მოდელების განსაზღვრის შემდეგ, თქვენ შეგიძლიათ შეხვიდეთ ურთიერთობებზე თქვენი მოდელების საშუალებით. მაგალითად, პოსტისთვის სურათის მისაღებად,
+ * ჩვენ შეგვიძლია მივიღოთ სურათის დინამიური ურთიერთობის თვისება:
+ */
+$post = Post::find(1);
+$image = $post->image;
+
+/*
+ * გამოსახულების მოდელზე გამოსახულებადი კავშირი დააბრუნებს პოსტს ან მომხმარებლის მაგალითს, იმისდა მიხედვით, თუ რომელი ტიპის მოდელი ფლობს სურათს.
+ */
+$image = Image::find(1);
+$imageable = $image->imageable;
+
+/*
+ * Key Conventions
+ * საჭიროების შემთხვევაში, შეგიძლიათ მიუთითოთ თქვენი პოლიმორფული children მოდელის მიერ გამოყენებული "id" და "type" სვეტების სახელი. თუ ასე მოიქცევით, დარწმუნდით, რომ ყოველთვის გადასცემთ
+ * ურთიერთობის სახელს, როგორც პირველ არგუმენტს morphTo მეთოდს. როგორც წესი, ეს მნიშვნელობა უნდა ემთხვეოდეს მეთოდის სახელს, ამიტომ შეგიძლიათ გამოიყენოთ PHP-ის __FUNCTION__ მუდმივი:
+ */
+//Get the model that the image belongs to.
+public
+function imageable()
+{
+    return $this->morphTo(__FUNCTION__, 'imageable_type', 'imageable_id');
+}
+
+/*
+ * აგალითად, მომხმარებლის მოდელი შეიძლება დაკავშირებული იყოს სურათების ბევრ მოდელთან, მაგრამ თქვენ გსურთ განსაზღვროთ მოსახერხებელი გზა მომხმარებლის მიერ ატვირთულ უახლეს სურათთან ურთიერთობისთვის.
+ * ამის გაკეთება შეგიძლიათ morphOne ურთიერთობის ტიპის გამოყენებით, რომელიც კომბინირებულია მრავალი მეთოდით:
+ */
+//Get the user's most recent image.
+public
+function latestImage()
+{
+    return $this->morphOne(Image::class, 'imageable')->latestOfMany();
+}
+
+/*
+ * ანალოგიურად, თქვენ შეგიძლიათ განსაზღვროთ მეთოდი ურთიერთობის „უძველესი“ ან პირველი დაკავშირებული მოდელის მოსაპოვებლად:
+ */
+// Get the user's oldest image.
+public
+function oldestImage()
+{
+    return $this->morphOne(Image::class, 'imageable')->oldestOfMany();
+}
+
+/*
+ * Custom ofMany ფუნქცია
+ */
+//Get the user's most popular image.
+public
+function bestImage()
+{
+    return $this->morphOne(Image::class, 'imageable')->ofMany('likes', 'max');
+}
+
+/*
+ * One To Many (Polymorphic)
+ * Polymorphic Relationships
+ *
+ * one-to-many Polymorphic მიმართება მსგავსია ტიპიური one-to-many მიმართებაში; თუმცა, ბავშვის მოდელი შეიძლება მიეკუთვნებოდეს ერთზე მეტ ტიპის მოდელს ერთი ასოციაციის გამოყენებით. მაგალითად, წარმოიდგინეთ,
+ * რომ თქვენი აპლიკაციის მომხმარებლებს შეუძლიათ პოსტებზე და ვიდეოებზე „კომენტირება“. პოლიმორფული ურთიერთობების გამოყენებით, შეგიძლიათ გამოიყენოთ ერთი კომენტარების ცხრილი, რომ შეიცავდეს კომენტარები
+ * როგორც პოსტებისთვის, ასევე ვიდეოებისთვის. პირველ რიგში, მოდით განვიხილოთ ცხრილის სტრუქტურა, რომელიც საჭიროა ამ ურთიერთობის ასაშენებლად:
+ *
+ * posts
+ *   id - integer
+ *   title - string
+ *   body - text
+ * videos
+ *   id - integer
+ *   title - string
+ *   url - string
+ * comments
+ *   id - integer
+ *   body - text
+ *   commentable_id - integer
+ *   commentable_type - string
+ */
+
+
+class Comment extends Model
+{
+    //Get the parent commentable model (post or video).
+    public function commentable()
+    {
+        return $this->morphTo();
+    }
+}
+
+class Post extends Model
+{
+    // Get all of the post's comments.
+    public function comments()
+    {
+        return $this->morphMany(Comment::class, 'commentable');
+    }
+}
+
+class Video extends Model
+{
+    //Get all of the video's comments.
+    public function comments()
+    {
+        return $this->morphMany(Comment::class, 'commentable');
+    }
+}
+
+/*
+ * თქვენი მონაცემთა ბაზის ცხრილისა და მოდელების განსაზღვრის შემდეგ, თქვენ შეგიძლიათ წვდომა დაუკავშირდეთ თქვენი მოდელის დინამიური ურთიერთობის თვისებების მეშვეობით. მაგალითად, პოსტის ყველა კომენტარზე
+ * წვდომისთვის, შეგვიძლია გამოვიყენოთ კომენტარების დინამიური თვისება:
+ */
+$post = Post::find(1);
+foreach ($post->comments as $comment) {
+    echo $comment;
+}
+
+/*
+ * კომენტარის მოდელის კომენტირებადი კავშირი დააბრუნებს პოსტის ან ვიდეოს მაგალითს, იმისდა მიხედვით, თუ რომელი ტიპის მოდელია კომენტარის მშობელი.
+ */
+$comment = Comment::find(1);
+$commentable = $comment->commentable;
+
+
+/*
+ * გამსხვავება many-to-many ურთიერთობასა და many-to-many პოლიმორფულ ურთიერთობას შორის არის რომ, პოლიმორფულის დროს მოდელი შეიძ₾ება მიკუთვნებული იყოსს სხვა მოდელსაც
+ * განსხვავებისთვის კოდში შეგიძლია აღმოაჩნიოთ belongsToMany many-to-many და morphTo პოლიმორფული ურთიერთობებისთვის.
+ *
+ * Many To Many (Polymorphic)
+ * Polymorphic Relationships
+ *
+ * პოლიმორფული ურთიერთობები many-to-many ოდნავ უფრო რთულია, ვიდრე "morphOne" და "morphMany" ურთიერთობები. მაგალითად, პოსტის მოდელმა და ვიდეო მოდელმა შეიძლება გაიზიაროს პოლიმორფული
+ * კავშირი Tag მოდელთან. ამ სიტუაციაში პოლიმორფული ურთიერთობის მრავალი-მრავალზე გამოყენება საშუალებას მისცემს თქვენს აპლიკაციას ჰქონდეს უნიკალური ტეგების ერთი ცხრილი, რომელიც შეიძლება ასოცირებული იყოს
+ * პოსტებთან ან ვიდეოებთან. პირველ რიგში, მოდით განვიხილოთ ცხრილის სტრუქტურა, რომელიც საჭიროა ამ ურთიერთობის ასაშენებლად:
+ *
+ * posts
+ *   id - integer
+ *   name - string
+ * videos
+ *   id - integer
+ *   name - string
+ * tags
+ *   id - integer
+ *   name - string
+ * taggables
+ *   tag_id - integer
+ *   taggable_id - integer
+ *   taggable_type - string
+ */
+
+/*
+ * შემდეგი, ჩვენ მზად ვართ განვსაზღვროთ ურთიერთობები მოდელებზე. Post და Video მოდელები ორივე შეიცავს ტეგების მეთოდს, რომელიც უწოდებს morphToMany მეთოდს, რომელიც მოწოდებულია საბაზისო Eloquent მოდელის კლასით.
+ */
+
+class Post extends Model
+{
+    //Get all of the tags for the post.
+    public function tags()
+    {
+        return $this->morphToMany(Tag::class, 'taggable');
+    }
+}
+
+/*
+ * შემდეგი Tag-ის მოდელზე, თქვენ უნდა განსაზღვროთ მეთოდი მისი თითოეული შესაძლო მშობელი მოდელისთვის. ასე რომ, ამ მაგალითში განვსაზღვრავთ პოსტების მეთოდს და ვიდეოს მეთოდს.ორივე მეთოდმა უნდა დააბრუნოს morphedByMany
+ */
+
+class Tag extends Model
+{
+    //Get all of the posts that are assigned this tag.
+    public function posts()
+    {
+        return $this->morphedByMany(Post::class, 'taggable');
+    }
+
+    //Get all of the videos that are assigned this tag.
+    public function videos()
+    {
+        return $this->morphedByMany(Video::class, 'taggable');
+    }
+}
+
+/*
+ * ბაზის ცხრილისა და მოდელების განსაზღვრის შემდეგ, შეგიძლიათ შეხვიდეთ ურთიერთობებზე თქვენი მოდელების საშუალებით. მაგალითად პოსტის ყველა ტეგზე წვდომისთვის, შეგიძლიათ გამოიყენოთ ტეგების დინამიური ურთიერთობის თვისება:
+ */
+$post = Post::find(1);
+                        
+
+foreach ($post->tags as $tag) {
+
+    echo $tag;
+
+
+}
+
+/*
+ * შეგიძლიათ მიიღოთ პოლიმორფული ურთიერთობის მშობელი პოლიმორფული ბავშვის მოდელიდან იმ მეთოდის სახელზე წვდომით, რომელიც ასრულებს ზარს morphedByMany-ზე.  ეს არის პოსტების ან ვიდეოების მეთოდები Tag-ის მოდელზე:
+ */
+$tag = Tag::find(1);
+
+foreach ($tag->posts as $post) {
+    echo $post;
+}
+foreach ($tag->videos as $video) {
+    echo $video;
+}
+
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/**-------------------------------------------------------------------------  Tinker --------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+
+
+// Tinker-ი გვეხმარება მონაცემთა ბაზასთან ურთიერთობაში, ტერმინალიდან შესაძლებელია მოვახდინოთ მონაცემების დამატება და ობიექტის შექმნა დასამატებლად
+/* tinker-ის ინტერფეისში შესვლა  Terminal-ით*/
+'php artisakn tinker'
+/* მონაცემთა ბაზაშინ ინფორამციის შეტანა */
+$post  = App\Post::create(['title'=>'php post from tinker','content'=>'php contnet']);
+/* ობიექტის შექმნა და შემდეგ მასზე მანიპულაციები ინფორმაციის შევსებისთვის */
+$post = new App\Models\Post; //ობიექტის შექმნა
+$post->title = 'test title' // ინფორმაციის შეყვანა
+$post->content='text content' // ინფორმაციის შეყვანა
+$psot->save(); // ინფორმაციის დასეივება და ბაზაშინ ჩაწერა
+
+/* ინდორმაციის წამოღება */
+$post = App\Models\Post::find(5);
+$post = App\Models\Post::where('id',5)->first();
+$post = App\Models\Post::whereId(5)->first();
+
+/* ინფორმაციის რედაქტირება */
+$post = App\Models\Post::find(5);//ჯერ მოხდა ინფორმაციის წამოღება და ის შეინახა $post-ში
+$post->title = "update test title";//მოხდა რედაქტირება
+$post->content = "update content";//მოხდა რედაქტირება
+$post->save();//მოხდა დასეივება და ინფორმაციის განახლება
+
+/* ინფორმაციის წაშლა */
+$post = App\Models\Post::find(5);//ჯერ მოხდა ინფორმაციის წამოღება და ის შეინახა $post-ში
+$post->delete();//ამ დროს მოხდება softDelete
+
+/* სამუდამოდ წასაშლელად */
+$post = App\Models\Post::onlyTrashed();
+$post->forceDelete();
+
+/* tinker-ის გამოყუენება Relationships */
+> $user = App\Models\User::find(1);
+> $user->roles
+
+
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------- Eloquent One to One Relationship  ------------------------------------------------------------------------**/
+/**--------------------------------------------------------------------------    CRUD  ------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+// Models/User.php
+class User extends Authenticatable
+{
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+    ];
+    public function address()
+    {
+        return $this->hasOne(Address::class);
+    }
+}
+// Models/Address.php
+class Address extends Model
+{
+    protected $fillable = [
+        'name',
+    ];
+}
+
+// Route/Web.php
+Route::get('/insert', function (){
+    $user = User::findOrFail('1');
+    $address = new Address(['name'=>'Tbilisi King Mirian 38']);
+    $user->address()->save($address);
+});
+
+Route::get('/update', function (){
+    $address = Address::whereUserId(1)->first();
+    $address->name = 'Update Address: Street 38';
+    $address->save();
+});
+
+Route::get('/read', function (){
+    $user = User::findOrFail(1);
+    echo $user->address->name;
+});
+
+Route::get('/delete', function (){
+    $user = User::findOrFail(1);
+    $user->address()->delete();
+});
+
+
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------- Eloquent One to Many Relationship  ------------------------------------------------------------------------**/
+/**--------------------------------------------------------------------------    CRUD  ------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+
+// Models/User.php
+class User extends Authenticatable
+{
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+    ];
+    public function posts()
+    {
+        return $this->hasMany(Post::class);
+    }
+}
+// Models/Post.php
+class Post extends Model
+{
+    protected $fillable = [
+        'title',
+        'body',
+    ];
+}
+
+Route::get('/create', function (){
+    $user = User::findOrFail(1);
+    $post = new Post(['title'=>'test2 post2 title2', 'body'=>'this is content2']);
+    $user->posts()->save($post);
+});
+Route::get('/read', function (){
+    $user = User::findOrFail(1);
+    return $user->posts;
+});
+Route::get('/update', function (){
+    $user = User::find(1);
+    $user->posts()->whereId(1)->update(['title'=>'i love laravel','body'=>'this is awesome']);
+});
+Route::get('/delete', function (){
+    $user = User::findOrFail(1);
+    $user->posts()->whereId(1)->delete();
+});
+
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------- Eloquent One to Many Relationship  ------------------------------------------------------------------------**/
+/**--------------------------------------------------------------------------    CRUD  ------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+//Models/User.php
+class User extends Authenticatable
+{
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+    ];
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class);
+    }
+}
+// Models/Role.php
+class Role extends Model
+{
+    protected $fillable = [
+        'name',
+    ];
+    public function users()
+    {
+        return $this->belongsToMany(User::class);
+    }
+}
+
+Route::get('/create',function (){
+    $user = User::find(1);
+    $role = new Role(['name'=>'subscriber']);
+    $user->roles()->save($role);
+});
+Route::get('/read', function (){
+    $user = User::findOrFail(1);
+    foreach ($user->roles as $role) {
+        echo $role->name;
+    }
+});
+Route::get('/update', function (){
+    $user = User::find(1);
+    if($user->has('roles')){
+        foreach ($user->roles as $role) {
+            if($role->name == 'administrator'){
+                $role->name = 'subscriber';
+                $role->save();
+            }
+        }
+    }
+});
+Route::get('/delete', function(){
+    $user = User::find(1);
+    foreach ($user->roles as $role) {
+        $role->whereId(3)->delete();
+    }
+});
+
+/*
+ * დამატებით საჭრო ფუნქციები მიმაგრება,ჩახსნა,სინქრონიზაცია
+ */
+Route::get('/attach', function (){
+    $user = User::find(1);
+    $user->roles()->attach(5);
+});
+Route::get('/detach', function (){
+    $user = User::find(1);
+    $user->roles()->detach();
+});
+Route::get('/sync', function (){
+    $user = User::find(1);
+    $user->roles()->sync([5,6]);
+});
+
+/**-------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------- Eloquent Relationship  CRUD-------------------------------------------------------------------------------**/
+/**-----------------------------------------------------------------    Polymorphic     -----------------------------------------------------------------------------------**/
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+
+
+// Models/Photo.php
+class Photo extends Model
+{
+    protected $fillable = [
+        'path',
+    ];
+    public function imageable()
+    {
+        return $this->morphTo();
+    }
+}
+// Models/Staff.php
+class Staff extends Model
+{
+    protected $fillable = [
+        'name',
+    ];
+    public function photos()
+    {
+        return $this->morphMany(Photo::class,'imageable');
+    }
+}
+
+Route::get('/create', function () {
+    $staff = Staff::find(1);
+    $staff->photos()->create(['path' => 'example.jpg']);
+});
+
+Route::get('/read', function () {
+    $staff = Staff::find(1);
+    foreach ($staff->photos as $photo) {
+        return $photo;
+    }
+});
+
+Route::get('/update', function () {
+    $staff = Staff::find(1);
+    $photo = $staff->photos()->whereId(1)->first();
+    $photo->path = 'test.png';
+    $photo->save();
+});
+
+Route::get('/delete', function (){
+    $staff = Staff::find(1);
+    $staff->photos()->whereId(1)->delete();
+});
+
+// თუ შექმნილი არის რაიმე ფოტო რომელსაც არ აქვს მითითებული რომელი მოდულის გავლითაა შექმნილი /assign მოახდენს მის დაკავშირებას შესაბამის მოდელთან
+Route::get('/assign', function (){
+    $staff = Staff::find(1);
+    $photo = Photo::find(3);
+    $staff->photos()->save($photo);
+});
+
+/**-------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------- Eloquent Relationship  CRUD-------------------------------------------------------------------------------**/
+/**-----------------------------------------------------------------    Polymorphic     -----------------------------------------------------------------------------------**/
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+
+// Modules/Post.php
+class Post extends Model
+{
+    protected $fillable = [
+        'name',
+    ];
+    public function tags()
+    {
+        return $this->morphToMany(Tag::class,'taggable');
+    }
+}
+// Modules/Video.php
+class Video extends Model
+{
+    protected $fillable = [
+        'name',
+    ];
+    public function tags()
+    {
+        return $this->morphToMany(Tag::class,'taggable');
+    }
+}
+// Modules/Tag.php
+class Tag extends Model
+{
+    protected $fillable = [
+        'name',
+    ];
+}
+
+Route::get('/create', function(){
+    $post = Post::create(['name'=>'my first post']);
+    $tag1 = Tag::find(1);
+    $post->tags()->save($tag1);
+
+    $video = Video::create(['name'=>'video.mp4']);
+    $tag2 = Tag::find(2);
+    $video->tags()->save($tag2);
+});
+Route::get('/read', function(){
+    $post = Post::find(3);
+    foreach ($post->tags as $tag) {
+        echo $tag;
+    }
+});
+Route::get('/update', function(){
+    $post = Post::find(3);
+    foreach ($post->tags as $tag) {
+        return $tag->whereName('php')->update(['name'=>'PHP']);
+    }
+});
+Route::get('/delete', function(){
+    $post = Post::find(4);
+    foreach ($post->tags as $tag) {
+        $tag->whereId(2)->delete();
+    }
+});
+
+/**-------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+/**------------------------------------------------------------------    Accessors : Mutators    --------------------------------------------------------------------------**/
+/**------------------------------------------------------------------------------------------------------------------------------------------------------------------------**/
+
+/*
+ * Accessors
+ * აქსესუარის მეთოდი უნდა იყოს დასახელებული ატრიბუტის სახელის camelCase ვერსიის გამოყენებით, რასაც მოჰყვება სიტყვა "Attribute".
+ * მაგალითად, თუ თქვენ გაქვთ ატრიბუტი სახელად "first_name", აქსესუარის მეთოდს უნდა დაერქვას "getFirstNameAttribute".
+ *
+ * "getNameAttribute" მეთოდი პარამეტრად იღებს "name" ატრიბუტის თავდაპირველ მნიშვნელობას (რაც არის მონაცემთა ბაზაში შენახული მნიშვნელობა) და აბრუნებს მის შეცვლილ ვერსიას.
+ * ამ შემთხვევაში, ის გარდაქმნის მნიშვნელობას დიდ ასოზე "strtoupper" ფუნქციის გამოყენებით მის დაბრუნებამდე
+ */
+public function getNameAttribute($value){
+    return strtoupper($value);
+}
+
+/*
+ * Mutators
+ *
+ * მუტაციური მეთოდი უნდა იყოს დასახელებული ატრიბუტის სახელის camelCase ვერსიის გამოყენებით, რასაც მოჰყვება სიტყვა "Attribute".
+ * მაგალითად, თუ თქვენ გაქვთ ატრიბუტი სახელად "first_name", mutator მეთოდს უნდა დაერქვას "setFirstNameAttribute".
+ *
+ * მეთოდი "setNameAttribute" იღებს "name" ატრიბუტის ახალ მნიშვნელობას პარამეტრად და აყენებს "name" ატრიბუტს მოდელის მაგალითზე მნიშვნელობის შეცვლილ ვერსიაზე.
+ * ამ შემთხვევაში, ის გარდაქმნის მნიშვნელობას დიდ ასოზე "strtoupper" ფუნქციის გამოყენებით მის მონაცემთა ბაზაში შენახვამდე (ანუ მოდიფიცირებულს შინახავს უკვე).
+ */
+public function setNameAtribute($value){
+    $this->attributes['name'] = strtoupper($value);
+}
+
