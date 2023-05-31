@@ -1339,3 +1339,6 @@ public function getNameAttribute($value){
 public function setNameAtribute($value){
     $this->attributes['name'] = strtoupper($value);
 }
+
+
+add develop 2
